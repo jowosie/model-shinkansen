@@ -1,7 +1,7 @@
-# =====================================
-# Chuo Shinkansen Simulation Parameters
-# All units in SI
-# =====================================
+# =======================================
+# Shinkansen Simulation Parameters
+# All units in SI unless otherwise stated
+# =======================================
 
 # Simulation Controls
 SIM_CONTROLS = {
@@ -37,10 +37,15 @@ LO_VEHICLE = {
     "height": 3.1,
     "length_intermediate_car": 24.3,
     "length_end_car": 28,
+    "length": (24.3 * 14) + (2 * 28),
+    "i_yaw": 1.6e6, # placeholder
+    "i_pitch": 8e5, # placeholder
+    "i_roll": 2e5, # placeholder
 
     # Aerodynamic Properties
     "cd_openair": 0.29,
     "tunnel_drag_multiplier": 1.5,
+    "frontal_area": 10, # placeholder
 }
 
 # Maglev parameters

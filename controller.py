@@ -1,4 +1,6 @@
-# == PID Controller v1 ==
+# =========================
+# Shinkansen PID Controller
+# =========================
 
 class PIDController:
     def __init__(self, Kp, Ki, Kd, setpoint):
