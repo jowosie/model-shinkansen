@@ -3,6 +3,8 @@ import matplotlib.pyplot as plt
 from physics import Train
 from controller import PIDController
 
+# == Main Loop v1 ==
+
 # Simulation Setup
 sim_time =      120         # seconds
 dt =            0.01        # time step

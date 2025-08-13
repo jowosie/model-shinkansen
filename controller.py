@@ -1,3 +1,5 @@
+# == PID Controller v1 ==
+
 class PIDController:
     def __init__(self, Kp, Ki, Kd, setpoint):
         self.Kp = Kp                # Proportional Gain
