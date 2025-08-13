@@ -1,5 +1,7 @@
 import numpy as np
 
+# Physics engine model v1
+
 class Train:
     def __init__(self, mass_kg, drag_coeff):
         self.mass_kg =      mass_kg

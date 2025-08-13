@@ -12,7 +12,7 @@ total_steps =   int(sim_time / dt)
 shinkansen = Train(mass_kg = 700000, drag_coeff = 0.25)
 
 # Create PID Controller
-pid = PIDController(Kp=50000, Ki=1000, Kd=20000, setpoint=80)
+pid = PIDController(Kp=150000, Ki=1, Kd=1, setpoint=80)
 
 # Data Logging
 time_log =      []
