@@ -1,7 +1,7 @@
-# =======================================
+"""
 # Shinkansen Simulation Parameters
 # All units in SI unless otherwise stated
-# =======================================
+"""
 
 # Simulation Controls
 SIM_CONTROLS = {
@@ -12,12 +12,12 @@ SIM_CONTROLS = {
 
 # Route and Infrastructure Parameters
 ROUTE_PARAMETERS = {
-    "phase1_length": 285600,
-    "phase2_length": 438000,
-    "testtrack_length": 42800,
+    "phase1_length": 285600, # length of track for chuo phase 1 implementation
+    "phase2_length": 438000, # full length of track for chuo shinkansen
+    "testtrack_length": 42800, # length of test track
     "max_gradient": 4,
     "min_curve_radius": 8000,
-    "tunnel_fraction": 0.86,
+    "tunnel_fraction": 0.86, # estimated fraction of tunnels for phase 2 line
 }
 
 # Vehicle Parameters
@@ -55,6 +55,11 @@ SCMAGLEV_SYSTEM = {
     "lsm_pole_pitch": 1.35,
     "target_avg_acceleration": 0.7,
     "target_avg_deceleration": 0.7,
+
+    # Coil Parameters
+    "coil_width": 0.15,
+    "coil_length": 0.4,
+    "coil_position_z": 10
 }
 
 # Physical Constants
