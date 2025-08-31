@@ -1,6 +1,6 @@
 """
-# Shinkansen Simulation Parameters
-# All units in SI unless otherwise stated
+Shinkansen Simulation Parameters
+All units in SI unless otherwise stated
 """
 
 # Simulation Controls
@@ -59,11 +59,21 @@ SCMAGLEV_SYSTEM = {
     # Coil Parameters
     "coil_width": 0.15,
     "coil_length": 0.4,
-    "coil_position_z": 10
+    "coil_position_z": 10,
+
+    # Levitation Force Parameters
+    "max_F_lev": 7.2e6,  # Max levitation force coefficient (N)
+    "decay_const": 50,  # Levitation force decay constant (1/m)
+    "lev_velocity": 41.67, # Characteristic speed for levitation (m/s)
+
+    # Guidance Force Parameters
+    "k_guidance": 2.5e6,  # Guidance stiffness (N/m)
+    "c_guidance": 5.0e4,  # Guidance damping (Ns/m)
 }
 
 # Physical Constants
 CONSTANTS = {
     "gravity": 9.81,
     "air_density": 1.225,
+    "mag_permeability": 1.25663706e-6
 }
