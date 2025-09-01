@@ -3,7 +3,9 @@ SHINKANSEN TRAIN DEFINITION
 Defines the train bodies and SCMs on the train
 """
 
-import magpylib as mpl
+from magpylib.magnet import Cuboid
+from magpylib import Collection
+import config
 
 class Train:
     def __init__(self, num_bogies=2, magnets_per_bogie=4, magnet_strength=1_000_000):
@@ -21,13 +23,12 @@ class Train:
 
     def create_bogies(self):
         """Creates the magnet arrangement for the train's bogies"""
-        bogies_collection = []
+        all_magnets = []
         bogie_length = 3 # meters
         magnet_spacing_length = bogie_length / (self.magnets_per_bogie / 2)
-        magnet_width_spacing = 0.5 # meters
+        magnet_width_spacing = config.SCMAGLEV_SYSTEM["lsm_pole_pitch"]
 
         for i in range(self.num_bogies):
-            bogie_magnets = []
             for j in range(self.magnets_per_bogie):
                 # Sets alternating polarities for magnets
                 polarity = 1 if j % 2 == 0 else -1
@@ -36,18 +37,15 @@ class Train:
                 y_pos = -magnet_width_spacing/2 + (j % 2) * magnet_width_spacing
                 z_pos = (j // 2) * magnet_spacing_length - (bogie_length / 2)
 
-                magnet = mpl.magnet.Cuboid(
+                magnet = Cuboid(
                     magnetization = (0,0, polarity * self.magnet_strength),
                     dimension = (0.5, 0.2, 0.4), # meters (length, width, height)
                     position = (x_pos, y_pos, z_pos)
                 )
-                bogie_magnets.append(magnet)
-
-            bogies_collection.append(mpl.Collection(bogie_magnets))
+                all_magnets.append(magnet)
 
         # Creates a single collection for all the magnets on the whole train
-        all_magnets = [mag for bogie in bogies_collection for mag in bogie.sources]
-        return mpl.Collection(all_magnets)
+        return Collection(all_magnets)
 
     def get_magnets(self):
         """Returns the magpylib collection of all magnets on the train."""

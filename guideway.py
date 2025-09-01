@@ -2,10 +2,11 @@
 SHINKANSEN GUIDEWAY DEFINITION
 """
 
-import magpylib as mpl
+from magpylib.current import Loop
+from magpylib import Collection
 
 class Guideway:
-    def __init__(self, length = 50, width = 10, coil_count = 100):
+    def __init__(self, length = 50, width = 10, coil_count = 100, coil_diameter = 0.05):
         """
         Initializes guideway.
         :param length (float): Length of guideway section (meters)
@@ -15,9 +16,11 @@ class Guideway:
         self.length = length
         self.width = width
         self.coil_count = coil_count
+        self.coil_diameter = coil_diameter
 
         self.levitation_coils = self._create_levitation_coils()
         self.guidance_coils = self.levitation_coils
+        self.propulsion_coils = self._create_propulsion_coils()
 
     def _create_levitation_coils(self):
         """
@@ -34,7 +37,7 @@ class Guideway:
                 y_pos = side * self.width / 2
 
                 # Top loop
-                loop1 = mpl.current.Loop(
+                loop1 = Loop(
                     current = 1,
                     diameter = coil_width,
                     position = (x_pos, y_pos, coil_length/2)
@@ -42,7 +45,7 @@ class Guideway:
                 loop1.rotate_from_angax(angle=90, axis='y')
 
                 # Bottom loop
-                loop2 = mpl.current.Loop(
+                loop2 = Loop(
                     current = 1,
                     diameter = coil_width,
                     position = (x_pos, y_pos, -coil_length/2)
@@ -51,8 +54,37 @@ class Guideway:
 
                 coils.extend([loop1, loop2])
 
-            return mpl.Collection(coils)
+        return Collection(coils)
 
     def get_levitation_coils(self):
         # Returns magpylib collection
         return self.levitation_coils
+
+    def _create_propulsion_coils(self):
+        """
+        Creates actively powered Linear Synchronous Motor coils for propulsion.
+        """
+
+        prop_coils = []
+        num_coils_per_side = int(self.length * 2)
+
+        for side in [-1, 1]:
+            for i in range(num_coils_per_side):
+                x_pos = (i - num_coils_per_side / 2) * 0.5
+                y_pos = side * (self.width / 2 - 0.2)
+                z_pos = 0
+
+                coil = Loop(
+                    current = 0,
+                    diameter = self.coil_diameter,
+                    position = (x_pos, y_pos, z_pos)
+                )
+
+                coil.rotate_from_angax(angle=90, axis='y')
+
+                prop_coils.append(coil)
+
+        return Collection(prop_coils)
+
+    def get_propulsion_coils(self):
+        return self.propulsion_coils

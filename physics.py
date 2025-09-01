@@ -7,16 +7,12 @@ simulation.
 import config
 import numpy as np
 import magpylib as mpl
-import train
-import guideway
 
 # Vehicle State (draw from main eventually)
-current_position = 0
-current_velocity = 0
-current_acceleration = 0
-levitation_gap = 0.1 # Placeholder for dynamic levitation gap (m)
-lateral_displacement = 0.01 # Placeholder for lateral displacement from guideway center (m)
-lateral_velocity = 0 # Placeholder for lateral velocity (m/s)
+coil_resistance = 0.01
+coil_inductance = 0.001
+pole_pitch = config.SCMAGLEV_SYSTEM["lsm_pole_pitch"]
+
 
 """
 FORCE MODELING
@@ -38,11 +34,11 @@ def calc_gravity_force(gravity, mass):
 
     f_grav = np.zeros(3)
 
-    f_grav[1] = -config.CONSTANTS["gravity"] * config.LO_VEHICLE["total_mass_loaded"]
+    f_grav[2] = -config.CONSTANTS["gravity"] * config.LO_VEHICLE["total_mass_loaded"]
     return f_grav
 
-# Levitation Force
-def calc_levitation_force(train, guideway, velocity, train_height, coil_resistance=0.01, coil_inductance=0.001):
+# Induced Force
+def calc_induced_force(train, guideway, velocity, train_height, lateral_displacement, coil_resistance=0.01, coil_inductance=0.001):
     """
     Calculates the levitation force on the train through an induced current in the guideway coils. Follows
     Faraday's Law of Induction.
@@ -51,16 +47,20 @@ def calc_levitation_force(train, guideway, velocity, train_height, coil_resistan
     :param guideway: Guideway object
     :param velocity: Current forward velocity of train in m/s
     :param train_height: Vertical position of the train above the guideway in meters
+    :param lateral_displacement: Lateral displacement from the guideway center in meters
     :param coil_resistance: Resistance of guideway coil in Ohms
     :param coil_inductance: Inductance of guideway coil in Henrys
 
-    :return: np.ndarray: Total levitation force vector [Fx, Fy, Fz] in Newtons
+    :return: np.ndarray: Total induced force vector [Fx, Fy, Fz] in Newtons
+    Fx = Magnetic drag force
+    Fy = Guidance force
+    Fz = Levitation force
     """
 
     if velocity < 1:
         return np.zeros(3)
 
-    f_levitation = np.zeros(3)
+    f_induced = np.zeros(3)
     train_magnets = train.get_magnets()
     guideway_coils = guideway.get_levitation_coils()
 
@@ -82,7 +82,6 @@ def calc_levitation_force(train, guideway, velocity, train_height, coil_resistan
                 coil_area = np.pi * (coil1.diameter / 2)**2
                 emf = -dB_dt[2] * coil_area # Uses z-component of B-field change
 
-                pole_pitch = 1.0
                 omega = 2 * np.pi * velocity / pole_pitch
                 impedance = np.sqrt(coil_resistance**2 + (omega * coil_inductance)**2)
 
@@ -96,20 +95,54 @@ def calc_levitation_force(train, guideway, velocity, train_height, coil_resistan
                 coil2.current = -induced_current
 
                 # Calculate Lorentz Force on the figure-eight coil using magpylib
-                lorentz_force = coil1.getF(magnet) + coil2.getF(magnet)
-                f_levitation += lorentz_force
+                lorentz_force = mpl.get_F(magnet, coil1) + mpl.get_F(magnet, coil2)
+                f_induced += lorentz_force
 
-    return f_levitation
+    return f_induced
 
-# Guidance Force
-
-
-# Magnetic Drag Force
-# Maglev Force
-
-# Thrust Force
-# Normal Force
 # Propulsion Force
+def calc_propulsion_force(train, guideway, velocity, target_velocity):
+    """
+    Calculates the propulsion force from the LSM modeling the interaction between the train's magnets and the
+    actively powered propulsion coils in the guideway.
+
+    :param train: Train object
+    :param guideway: Guideway object
+    :param velocity: Current forward velocity of train in m/s
+    :param target_velocity: Target forward velocity of train in m/s
+
+    :return: np.ndarray: Total propulsion force vector [Fx, Fy, Fz] in Newtons
+    """
+
+    f_propulsion = np.zeros(3)
+
+    error = target_velocity - velocity
+    current_gain = 100_000
+    max_current = np.clip(error * current_gain, -5000, 5000)
+
+    train_magnets = train.get_magnets()
+    propulsion_coils = guideway.get_propulsion_coils()
+
+    lsm_wavelength = 2.0 * pole_pitch
+
+    for magnet in train_magnets:
+        for coil in propulsion_coils:
+            # Only consider nearby coils
+            if abs(magnet.position[0] - coil.position[0]) < 3.0:
+
+                # Create traveling magnetic wave using phase difference between magnet
+                # position and coil position.
+                phase = (2 * np.pi / lsm_wavelength) * (coil.position[0] - magnet.position[0])
+
+                magnet_polarity = np.sign(magnet.orientation.as_rotvec()[2])
+
+                coil.current = magnet_polarity * max_current * np.sin(phase + np.pi/2)
+
+                force = mpl.get_F(magnet, coil)
+                f_propulsion += force
+
+    return f_propulsion
+
 
 # Aerodynamic Drag
 def calc_aero_drag_force(velocity, density, drag_coeff, frontal_area):
@@ -131,3 +164,4 @@ def calc_aero_drag_force(velocity, density, drag_coeff, frontal_area):
     frontal_area = config.LO_VEHICLE["frontal_area"]
 
     f_aero_drag[0] = -0.5 * density * velocity**2 * drag_coeff * frontal_area
+    return f_aero_drag
