@@ -7,6 +7,7 @@ simulation.
 import config
 import numpy as np
 import magpylib as mpl
+import magpylib_force as mpf
 
 # Vehicle State (draw from main eventually)
 coil_resistance = 0.01
@@ -19,8 +20,6 @@ FORCE MODELING
 Calculates all relevant forces acting on the train body while in operation.
 """
 
-F_total = np.empty([3,4], dtype=np.float64) # empty matrix for total force calculations
-
 # Gravity Force
 def calc_gravity_force(gravity, mass):
     """
@@ -32,7 +31,7 @@ def calc_gravity_force(gravity, mass):
     :return: np.ndarray: Gravity force vector [Fx, Fy, Fz] in Newtons
     """
 
-    f_grav = np.zeros(3)
+    f_grav = np.zeros(3, dtype=float)
 
     f_grav[2] = -config.CONSTANTS["gravity"] * config.LO_VEHICLE["total_mass_loaded"]
     return f_grav
@@ -58,9 +57,9 @@ def calc_induced_force(train, guideway, velocity, train_height, lateral_displace
     """
 
     if velocity < 1:
-        return np.zeros(3)
+        return np.zeros(3, dtype=float)
 
-    f_induced = np.zeros(3)
+    f_induced = np.zeros(3,dtype=float)
     train_magnets = train.get_magnets()
     guideway_coils = guideway.get_levitation_coils()
 
@@ -95,8 +94,9 @@ def calc_induced_force(train, guideway, velocity, train_height, lateral_displace
                 coil2.current = -induced_current
 
                 # Calculate Lorentz Force on the figure-eight coil using magpylib
-                lorentz_force = mpl.get_F(magnet, coil1) + mpl.get_F(magnet, coil2)
-                f_induced += lorentz_force
+                force_i1, torque_i1 = mpf.getFT(magnet, coil1, anchor=(0,0,0))
+                force_i2, torque_i2 = mpf.getFT(magnet, coil2, anchor=(0,0,0))
+                f_induced += force_i1 + force_i2
 
     return f_induced
 
@@ -114,7 +114,7 @@ def calc_propulsion_force(train, guideway, velocity, target_velocity):
     :return: np.ndarray: Total propulsion force vector [Fx, Fy, Fz] in Newtons
     """
 
-    f_propulsion = np.zeros(3)
+    f_propulsion = np.zeros(3, dtype=float)
 
     error = target_velocity - velocity
     current_gain = 100_000
@@ -138,8 +138,8 @@ def calc_propulsion_force(train, guideway, velocity, target_velocity):
 
                 coil.current = magnet_polarity * max_current * np.sin(phase + np.pi/2)
 
-                force = mpl.get_F(magnet, coil)
-                f_propulsion += force
+                force_p, torque_p = mpf.getFT(magnet, coil, anchor=(0,0,0))
+                f_propulsion += force_p
 
     return f_propulsion
 
@@ -157,7 +157,7 @@ def calc_aero_drag_force(velocity, density, drag_coeff, frontal_area):
     :return: np.ndarray: Aerodynamic drag force vector [Fx, Fy, Fz] in Newtons
     """
 
-    f_aero_drag = np.zeros(3)
+    f_aero_drag = np.zeros(3, dtype=float)
 
     density = config.CONSTANTS["air_density"]
     drag_coeff = config.LO_VEHICLE["cd_openair"]

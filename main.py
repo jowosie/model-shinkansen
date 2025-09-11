@@ -13,7 +13,6 @@ import config
 def simulation():
     """
     Main function to run the simulation
-    :return:
     """
 
     # Simulation Parameters
@@ -56,6 +55,8 @@ def simulation():
             aero_drag_forces = calc_aero_drag_force(velocity[0], air_density, config.LO_VEHICLE["cd_openair"], config.LO_VEHICLE["frontal_area"])
 
             total_forces = induced_forces + propulsion_forces + gravitational_forces + aero_drag_forces
+
+            total_forces = np.array(total_forces)
 
             acceleration = total_forces / mass
 

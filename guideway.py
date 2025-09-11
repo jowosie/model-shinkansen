@@ -2,8 +2,8 @@
 SHINKANSEN GUIDEWAY DEFINITION
 """
 
-from magpylib.current import Loop
-from magpylib import Collection
+import magpylib as mpl
+import magpylib_force as mpf
 
 class Guideway:
     def __init__(self, length = 50, width = 10, coil_count = 100, coil_diameter = 0.05):
@@ -18,10 +18,11 @@ class Guideway:
         self.coil_count = coil_count
         self.coil_diameter = coil_diameter
 
-        self.levitation_coils = self._create_levitation_coils()
+        self.levitation_coils = self._create_levitation_coils
         self.guidance_coils = self.levitation_coils
         self.propulsion_coils = self._create_propulsion_coils()
 
+    @property
     def _create_levitation_coils(self):
         """
         Creates figure eight null-flux coils for levitation and guidance.
@@ -37,24 +38,28 @@ class Guideway:
                 y_pos = side * self.width / 2
 
                 # Top loop
-                loop1 = Loop(
+                loop1 = mpl.current.Loop(
                     current = 1,
                     diameter = coil_width,
                     position = (x_pos, y_pos, coil_length/2)
                 )
                 loop1.rotate_from_angax(angle=90, axis='y')
 
+                loop1.meshing = (5, 5)
+
                 # Bottom loop
-                loop2 = Loop(
+                loop2 = mpl.current.Loop(
                     current = 1,
                     diameter = coil_width,
                     position = (x_pos, y_pos, -coil_length/2)
                 )
                 loop2.rotate_from_angax(angle=90, axis='y')
 
+                loop2.meshing = (5,5)
+
                 coils.extend([loop1, loop2])
 
-        return Collection(coils)
+        return mpl.Collection(coils)
 
     def get_levitation_coils(self):
         # Returns magpylib collection
@@ -74,17 +79,19 @@ class Guideway:
                 y_pos = side * (self.width / 2 - 0.2)
                 z_pos = 0
 
-                coil = Loop(
+                coil = mpl.current.Loop(
                     current = 0,
                     diameter = self.coil_diameter,
                     position = (x_pos, y_pos, z_pos)
                 )
 
+                coil.meshing = (5,5)
+
                 coil.rotate_from_angax(angle=90, axis='y')
 
                 prop_coils.append(coil)
 
-        return Collection(prop_coils)
+        return mpl.Collection(prop_coils)
 
     def get_propulsion_coils(self):
         return self.propulsion_coils

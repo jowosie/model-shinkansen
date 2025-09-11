@@ -3,8 +3,7 @@ SHINKANSEN TRAIN DEFINITION
 Defines the train bodies and SCMs on the train
 """
 
-from magpylib.magnet import Cuboid
-from magpylib import Collection
+import magpylib as mpl
 import config
 
 class Train:
@@ -37,15 +36,17 @@ class Train:
                 y_pos = -magnet_width_spacing/2 + (j % 2) * magnet_width_spacing
                 z_pos = (j // 2) * magnet_spacing_length - (bogie_length / 2)
 
-                magnet = Cuboid(
+                magnet = mpl.magnet.Cuboid(
                     magnetization = (0,0, polarity * self.magnet_strength),
                     dimension = (0.5, 0.2, 0.4), # meters (length, width, height)
                     position = (x_pos, y_pos, z_pos)
                 )
                 all_magnets.append(magnet)
 
+                magnet.meshing = (5,5,5)
+
         # Creates a single collection for all the magnets on the whole train
-        return Collection(all_magnets)
+        return mpl.Collection(all_magnets)
 
     def get_magnets(self):
         """Returns the magpylib collection of all magnets on the train."""
