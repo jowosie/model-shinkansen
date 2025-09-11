@@ -14,7 +14,6 @@ coil_resistance = 0.01
 coil_inductance = 0.001
 pole_pitch = config.SCMAGLEV_SYSTEM["lsm_pole_pitch"]
 
-
 """
 FORCE MODELING
 Calculates all relevant forces acting on the train body while in operation.
@@ -96,7 +95,7 @@ def calc_induced_force(train, guideway, velocity, train_height, lateral_displace
                 # Calculate Lorentz Force on the figure-eight coil using magpylib
                 force_i1, torque_i1 = mpf.getFT(magnet, coil1, anchor=(0,0,0))
                 force_i2, torque_i2 = mpf.getFT(magnet, coil2, anchor=(0,0,0))
-                f_induced += force_i1 + force_i2
+                f_induced += np.array(force_i1) + np.array(force_i2)
 
     return f_induced
 
@@ -128,18 +127,18 @@ def calc_propulsion_force(train, guideway, velocity, target_velocity):
     for magnet in train_magnets:
         for coil in propulsion_coils:
             # Only consider nearby coils
-            if abs(magnet.position[0] - coil.position[0]) < 3.0:
+            if abs(magnet.position[0] - coil.position[0]) < 3:
 
                 # Create traveling magnetic wave using phase difference between magnet
                 # position and coil position.
                 phase = (2 * np.pi / lsm_wavelength) * (coil.position[0] - magnet.position[0])
 
-                magnet_polarity = np.sign(magnet.orientation.as_rotvec()[2])
+                magnet_polarity = np.sign(magnet.magnetization[2])
 
                 coil.current = magnet_polarity * max_current * np.sin(phase + np.pi/2)
 
                 force_p, torque_p = mpf.getFT(magnet, coil, anchor=(0,0,0))
-                f_propulsion += force_p
+                f_propulsion += np.array(force_p)
 
     return f_propulsion
 

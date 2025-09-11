@@ -18,11 +18,10 @@ class Guideway:
         self.coil_count = coil_count
         self.coil_diameter = coil_diameter
 
-        self.levitation_coils = self._create_levitation_coils
+        self.levitation_coils = self._create_levitation_coils()
         self.guidance_coils = self.levitation_coils
         self.propulsion_coils = self._create_propulsion_coils()
 
-    @property
     def _create_levitation_coils(self):
         """
         Creates figure eight null-flux coils for levitation and guidance.
