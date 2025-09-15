@@ -35,17 +35,20 @@ def derivatives(t, y, train, guideway, target_velocity):
 
     # Calculate Forces
     mass = config.LO_VEHICLE["total_mass_loaded"]
-    gravity = config.CONSTANTS["gravity"]
     air_density = config.CONSTANTS["air_density"]
 
     induced_forces = calc_induced_force(train, guideway, velocity[0], position[2], position[1])
+    print(induced_forces)
     propulsion_forces = calc_propulsion_force(train, guideway, velocity[0], target_velocity)
-    gravitational_forces = calc_gravity_force(gravity, mass)
+    print(propulsion_forces)
+    gravitational_forces = calc_gravity_force(mass)
+    print(gravitational_forces)
     aero_drag_forces = calc_aero_drag_force(velocity[0],air_density,config.LO_VEHICLE["cd_openair"],config.LO_VEHICLE["frontal_area"],)
+    print(aero_drag_forces)
 
-    total_forces = (
-        np.array(induced_forces) + np.array(propulsion_forces) + np.array(gravitational_forces) + np.array(aero_drag_forces)
-    )
+    total_forces = np.sum([induced_forces, propulsion_forces, gravitational_forces, aero_drag_forces], axis=0)
+
+    print(total_forces)
 
     # Calculate acceleration
     acceleration = total_forces / mass

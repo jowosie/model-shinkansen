@@ -69,6 +69,8 @@ SCMAGLEV_SYSTEM = {
     # Guidance Force Parameters
     "k_guidance": 2.5e6,  # Guidance stiffness (N/m)
     "c_guidance": 5.0e4,  # Guidance damping (Ns/m)
+
+    "current_gain": 100_000
 }
 
 # Physical Constants

@@ -5,8 +5,9 @@ SHINKANSEN GUIDEWAY DEFINITION
 import magpylib as mpl
 import magpylib_force as mpf
 
+
 class Guideway:
-    def __init__(self, length = 50, width = 10, coil_count = 100, coil_diameter = 0.05):
+    def __init__(self, length=50, width=10, coil_count=100, coil_diameter=0.05):
         """
         Initializes guideway.
         :param length (float): Length of guideway section (meters)
@@ -24,12 +25,12 @@ class Guideway:
 
     def _create_levitation_coils(self):
         """
-        Creates figure eight null-flux coils for levitation and guidance.
+        Creates figure eight null-flux coils for levitation and guidance using Loop objects.
         """
         coils = []
         coil_spacing = self.length / self.coil_count
-        coil_width = 0.3 # meters
-        coil_length = 0.4 # meters
+        coil_width = 0.3  # meters
+        coil_length = 0.4  # meters
 
         for side in [-1, 1]:
             for i in range(self.coil_count):
@@ -38,23 +39,21 @@ class Guideway:
 
                 # Top loop
                 loop1 = mpl.current.Loop(
-                    current = 1,
-                    diameter = coil_width,
-                    position = (x_pos, y_pos, coil_length/2)
+                    current=1,
+                    diameter=coil_width,
+                    position=(x_pos, y_pos, coil_length / 2)
                 )
                 loop1.rotate_from_angax(angle=90, axis='y')
-
                 loop1.meshing = (5, 5)
 
                 # Bottom loop
                 loop2 = mpl.current.Loop(
-                    current = 1,
-                    diameter = coil_width,
-                    position = (x_pos, y_pos, -coil_length/2)
+                    current=1,
+                    diameter=coil_width,
+                    position=(x_pos, y_pos, -coil_length / 2)
                 )
                 loop2.rotate_from_angax(angle=90, axis='y')
-
-                loop2.meshing = (5,5)
+                loop2.meshing = (5, 5)
 
                 coils.extend([loop1, loop2])
 
@@ -66,11 +65,11 @@ class Guideway:
 
     def _create_propulsion_coils(self):
         """
-        Creates actively powered Linear Synchronous Motor coils for propulsion.
+        Creates actively powered LSM coils for propulsion using Line objects.
         """
-
         prop_coils = []
         num_coils_per_side = int(self.length * 2)
+        coil_side_length = self.coil_diameter
 
         for side in [-1, 1]:
             for i in range(num_coils_per_side):
@@ -78,16 +77,21 @@ class Guideway:
                 y_pos = side * (self.width / 2 - 0.2)
                 z_pos = 0
 
-                coil = mpl.current.Loop(
-                    current = 0,
-                    diameter = self.coil_diameter,
-                    position = (x_pos, y_pos, z_pos)
+                # Define the four corners of a square path for the current
+                vertices = [
+                    (x_pos - coil_side_length / 2, y_pos, z_pos - coil_side_length / 2),
+                    (x_pos + coil_side_length / 2, y_pos, z_pos - coil_side_length / 2),
+                    (x_pos + coil_side_length / 2, y_pos, z_pos + coil_side_length / 2),
+                    (x_pos - coil_side_length / 2, y_pos, z_pos + coil_side_length / 2),
+                    (x_pos - coil_side_length / 2, y_pos, z_pos - coil_side_length / 2)
+                ]
+
+                coil = mpl.current.Line(
+                    current=0,
+                    vertices=vertices
                 )
 
-                coil.meshing = (5,5)
-
-                coil.rotate_from_angax(angle=90, axis='y')
-
+                coil.meshing = 20
                 prop_coils.append(coil)
 
         return mpl.Collection(prop_coils)
