@@ -1,7 +1,7 @@
-print("\n\n >>>>> LOADING PHYSICS.PY <<<<<\n\n")
+print("\n >>>>> LOADING PHYSICS.PY <<<<<\n")
 
 """
-SHINKANSEN PHYSICS ENGINE [v1.1]
+SHINKANSEN PHYSICS ENGINE [v1.4]
 Custom built physics engine to model all physics needed to run the maglev
 simulation.
 """
@@ -92,48 +92,42 @@ def calc_induced_force(
 
     return f_induced
 
-
 # Propulsion Force
 def calc_propulsion_force(
-    train: Train, guideway: Guideway, velocity: float, target_velocity: float
+    train: Train, guideway: Guideway, velocity: float, target_velocity: float, train_x_position: float
 ) -> np.ndarray:
     """
     Calculates the propulsion force from the LSM.
     """
     f_propulsion = np.zeros(3, dtype=float)
-
-    # Cleaned up: Get collections once at the start
     train_magnets = train.get_magnets()
     propulsion_coils = guideway.get_propulsion_coils()
 
-    # Reset all coil currents to 0
-    for coil in propulsion_coils.sources:
-        coil.current = 0
-
+    # Determine the control current based on the speed error
     error = target_velocity - velocity
     current_gain = config.SCMAGLEV_SYSTEM["current_gain"]
     max_current = np.clip(error * current_gain, -5000, 5000)
 
     lsm_wavelength = 2.0 * pole_pitch
 
+    # 1. Set the currents for all coils to create a traveling magnetic wave.
+    #    The phase is locked to the train's position to ensure synchronization.
+    #    A phase shift of -pi/2 is used to maximize the thrust force.
+    for coil in propulsion_coils.sources:
+        phase = (2 * np.pi / lsm_wavelength) * (coil.position[0] - train_x_position)
+        coil.current = max_current * np.sin(phase)
+
+    # 2. Now, calculate the total force on the train by summing the
+    #    forces exerted by this magnetic wave on each of the train's magnets.
     for magnet in train_magnets.sources:
         for coil in propulsion_coils.sources:
-            # Calculate forces only for nearby coils
+            # Only calculate for nearby coils to save computation
             if abs(magnet.position[0] - coil.position[0]) < 3.0:
-                phase = (2 * np.pi / lsm_wavelength) * (
-                    coil.position[0] - magnet.position[0]
-                )
-
-                magnet_polarity = np.sign(magnet.magnetization[2])
-
-                coil.current = magnet_polarity * max_current * np.sin(phase + np.pi / 2)
-
-                force_p, _ = mpf.getFT(magnet, coil, anchor=(0, 0, 0))
-
+                # Calculate the force ON the magnet FROM the coil
+                force_p, _ = mpf.getFT(coil, magnet, anchor=(0, 0, 0))
                 f_propulsion += force_p
 
     return f_propulsion
-
 
 # Aerodynamic Drag
 def calc_aero_drag_force(
@@ -146,3 +140,19 @@ def calc_aero_drag_force(
     # Drag force opposes the direction of velocity
     f_aero_drag[0] = -0.5 * density * velocity * abs(velocity) * drag_coeff * frontal_area
     return f_aero_drag
+
+def calc_wheel_support_force(
+    velocity: float, levitation_force: float, gravitational_force: float
+) -> np.ndarray:
+    """
+    Calculates the support force from the wheels at low speeds.
+    """
+    f_wheel_support = np.zeros(3, dtype=float)
+    takeoff_speed = config.SCMAGLEV_SYSTEM["levitation_takeoff_speed"] # m/s
+
+    if abs(velocity) < takeoff_speed:
+        # Only apply support force if the net force is downwards
+        if (levitation_force + gravitational_force) < 0:
+            f_wheel_support[2] = -(levitation_force + gravitational_force)
+
+    return f_wheel_support

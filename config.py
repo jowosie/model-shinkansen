@@ -5,9 +5,8 @@ All units in SI unless otherwise stated
 
 # Simulation Controls
 SIM_CONTROLS = {
-    "dt": 5,
-    "sim_time_min": 120,
-    "sim_time_sec": 120 * 60,
+    "dt": 0.05,
+    "sim_time_min": 1,
 }
 
 # Route and Infrastructure Parameters

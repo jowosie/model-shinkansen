@@ -3,7 +3,7 @@ SHINKANSEN GUIDEWAY DEFINITION
 """
 
 import magpylib as mpl
-import magpylib_force as mpf
+import config
 
 
 class Guideway:
@@ -71,10 +71,13 @@ class Guideway:
         num_coils_per_side = int(self.length * 2)
         coil_side_length = self.coil_diameter
 
+        # Use same spacing as magnet spacing
+        magnet_width_spacing = config.SCMAGLEV_SYSTEM["lsm_pole_pitch"]
+
         for side in [-1, 1]:
             for i in range(num_coils_per_side):
                 x_pos = (i - num_coils_per_side / 2) * 0.5
-                y_pos = side * (self.width / 2 - 0.2)
+                y_pos = side * (magnet_width_spacing / 2 - 0.2)
                 z_pos = 0
 
                 # Define the four corners of a square path for the current

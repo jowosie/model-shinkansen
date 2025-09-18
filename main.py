@@ -12,6 +12,7 @@ from physics import (
     calc_induced_force,
     calc_propulsion_force,
     calc_aero_drag_force,
+    calc_wheel_support_force
 )
 import config
 
@@ -38,17 +39,13 @@ def derivatives(t, y, train, guideway, target_velocity):
     air_density = config.CONSTANTS["air_density"]
 
     induced_forces = calc_induced_force(train, guideway, velocity[0], position[2], position[1])
-    print(induced_forces)
-    propulsion_forces = calc_propulsion_force(train, guideway, velocity[0], target_velocity)
-    print(propulsion_forces)
+    propulsion_forces = calc_propulsion_force(train, guideway, velocity[0], target_velocity, position[0])
     gravitational_forces = calc_gravity_force(mass)
-    print(gravitational_forces)
     aero_drag_forces = calc_aero_drag_force(velocity[0],air_density,config.LO_VEHICLE["cd_openair"],config.LO_VEHICLE["frontal_area"],)
-    print(aero_drag_forces)
 
-    total_forces = np.sum([induced_forces, propulsion_forces, gravitational_forces, aero_drag_forces], axis=0)
+    wheel_support_forces = calc_wheel_support_force(velocity[0], induced_forces[2], gravitational_forces[2])
 
-    print(total_forces)
+    total_forces = np.sum([induced_forces, propulsion_forces, gravitational_forces, aero_drag_forces, wheel_support_forces], axis=0)
 
     # Calculate acceleration
     acceleration = total_forces / mass
@@ -61,9 +58,16 @@ def rk4_step(t, y, dt, train, guideway, target_velocity):
     """
     Performs a single step of the RK4 method.
     """
+    print(f"  Calculating RK4 step 1/4 for time t={t:.2f}s...")
     k1 = derivatives(t, y, train, guideway, target_velocity)
+
+    print(f"  Calculating RK4 step 2/4 for time t={t:.2f}s...")
     k2 = derivatives(t + 0.5 * dt, y + 0.5 * dt * k1, train, guideway, target_velocity)
+
+    print(f"  Calculating RK4 step 3/4 for time t={t:.2f}s...")
     k3 = derivatives(t + 0.5 * dt, y + 0.5 * dt * k2, train, guideway, target_velocity)
+
+    print(f"  Calculating RK4 step 4/4 for time t={t:.2f}s...")
     k4 = derivatives(t + dt, y + dt * k3, train, guideway, target_velocity)
 
     return y + (dt / 6.0) * (k1 + 2 * k2 + 2 * k3 + k4)
@@ -75,14 +79,14 @@ def simulation():
     """
 
     # Simulation Parameters
-    simulation_duration = 60  # s
-    time_step = 0.1  # s
+    simulation_duration = config.SIM_CONTROLS["sim_time_min"] * 60  # s
+    time_step = config.SIM_CONTROLS["dt"]  # s
     target_velocity = 138  # m/s
 
     # Initialize Model Objects
-    print("Initializing train and guideway models...")
+    print("\n >>>>> INITIALIZING TRAIN AND GUIDEWAY MODELS <<<<<\n")
     train = Train(num_bogies=2, magnets_per_bogie=8)
-    guideway = Guideway(length=2000)
+    guideway = Guideway(length=50)
 
     # Initialize State Variables
     # State vector y = [x, y, z, vx, vy, vz]
@@ -94,17 +98,23 @@ def simulation():
     position_history = []
     force_history = []
 
+    on_wheels = True # Flag to tell whether train is on wheels or not
+
     # Simulation Loop
-    print("Starting simulation...")
+    print("\n >>>>> STARTING SIMULATION <<<<<\n")
     for t in np.arange(0, simulation_duration, time_step):
         try:
             y = rk4_step(t, y, time_step, train, guideway, target_velocity)
 
-            # Constraints
-            # Prevents the train from falling through the guideway
-            if y[2] < 0.02 and y[5] < 0:
+            if on_wheels and y[3] >= config.SCMAGLEV_SYSTEM["levitation_takeoff_speed"]:
+                on_wheels = False
+                print(" >>> TAKEOFF SPEED REACHED -- LEVITATION SYSTEM ENGAGED <<<")
+
+            # Prevents the train from falling through the guideway when on wheels
+            if on_wheels and y[2] < 0.02:
                 y[2] = 0.02  # z position
-                y[5] = 0  # vz velocity
+                if y[5] < 0:
+                    y[5] = 0  # vz velocity
 
             # Record Data
             time_history.append(t)
@@ -115,7 +125,7 @@ def simulation():
                 * config.LO_VEHICLE["total_mass_loaded"]
             )  # Stores levitation forces (F_z = m*a_z)
 
-            if int(t) % 5 == 0:
+            if t % 1 == 0:
                 print(
                     f"Time: {t:.1f}s, Speed: {y[3] * 3.6:.1f} km/h, Levitation gap: {y[2] * 100:.2f} cm"
                 )
