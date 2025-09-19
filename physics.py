@@ -1,7 +1,7 @@
 print("\n >>>>> LOADING PHYSICS.PY <<<<<\n")
 
 """
-SHINKANSEN PHYSICS ENGINE [v1.4]
+SHINKANSEN PHYSICS ENGINE [v1.5]
 Custom built physics engine to model all physics needed to run the maglev
 simulation.
 """
@@ -17,7 +17,6 @@ from guideway import Guideway
 coil_resistance = 0.01
 coil_inductance = 0.001
 pole_pitch = config.SCMAGLEV_SYSTEM["lsm_pole_pitch"]
-
 
 """
 FORCE MODELING
@@ -39,18 +38,19 @@ def calc_gravity_force(mass: float) -> np.ndarray:
 
 
 def calc_induced_force(
-    train: Train,
-    guideway: Guideway,
-    velocity: float,
-    train_height: float,
-    lateral_displacement: float,
-    coil_resistance: float = 0.01,
-    coil_inductance: float = 0.001,
+        train: Train,
+        guideway: Guideway,
+        velocity: float,
+        train_height: float,
+        lateral_displacement: float,
+        coil_resistance: float = 0.01,
+        coil_inductance: float = 0.001,
 ) -> np.ndarray:
     """
     Calculates the levitation force on the train through an induced current in the guideway coils. Follows
     Faraday's Law of Induction.
     """
+    # Return zero force at very low speeds
     if abs(velocity) < 1.0:
         return np.zeros(3, dtype=float)
 
@@ -68,7 +68,8 @@ def calc_induced_force(
                 coil1 = guideway_coils.sources[coil_pair_index]
                 coil2 = guideway_coils.sources[coil_pair_index + 1]
 
-                if abs(magnet.position[0] - coil1.position[0]) < 2:
+                # Check if magnet is close enough to coil to have significant interaction
+                if abs(magnet.position[0] - coil1.position[0]) < 4:
                     B = mpl.getB(magnet, coil1.position)
 
                     delta_x = 0.01
@@ -82,7 +83,7 @@ def calc_induced_force(
 
                     omega = 2 * np.pi * abs(velocity) / pole_pitch
                     impedance = np.sqrt(
-                        coil_resistance**2 + (omega * coil_inductance) ** 2
+                        coil_resistance ** 2 + (omega * coil_inductance) ** 2
                     )
 
                     induced_current = emf / impedance if impedance > 0 else 0
@@ -93,10 +94,12 @@ def calc_induced_force(
                     force_i1, _ = mpf.getFT(magnet, coil1, anchor=(0, 0, 0))
                     force_i2, _ = mpf.getFT(magnet, coil2, anchor=(0, 0, 0))
                     f_induced += force_i1 + force_i2
+
+        # CRITICAL FIX: Always return a numpy array, even if no forces were calculated
         return f_induced
 
     except TypeError as e:
-        print("\n" + "="*20 + " INDUCED FORCE DEBUGGER " + "="*20)
+        print("\n" + "=" * 20 + " INDUCED FORCE DEBUGGER " + "=" * 20)
         print(f"Caught a TypeError inside calc_induced_force!")
         print(f"Error message: {e}")
         print("\n--- LOOP STATE ---")
@@ -108,13 +111,13 @@ def calc_induced_force(
         print(f"dB_dx  | value: {dB_dx}\t| type: {type(dB_dx)}")
         print(f"dB_dt  | value: {dB_dt}\t| type: {type(dB_dt)}")
         print(f"emf    | value: {emf}\t| type: {type(emf)}")
-        print("="*62 + "\n")
+        print("=" * 62 + "\n")
         raise e
 
 
 def calc_propulsion_force(
-    train: Train, guideway: Guideway, velocity: float, target_velocity: float,
-    train_x_position: float, time: float = 0
+        train: Train, guideway: Guideway, velocity: float, target_velocity: float,
+        train_x_position: float, time: float = 0
 ) -> np.ndarray:
     """
     Calculates the propulsion force from the LSM.
@@ -164,7 +167,7 @@ def calc_propulsion_force(
         for coil in propulsion_coils.sources:
             # Only calculate for nearby coils to save computation
             distance = abs(magnet.position[0] - coil.position[0])
-            if distance < 3.0:
+            if distance < 5.0:
                 # Calculate the force ON the magnet FROM the coil
                 # Note: The force direction might need to be reversed depending on
                 # the magpylib convention
@@ -182,9 +185,10 @@ def calc_propulsion_force(
 
     return f_propulsion
 
+
 # Aerodynamic Drag
 def calc_aero_drag_force(
-    velocity: float, density: float, drag_coeff: float, frontal_area: float
+        velocity: float, density: float, drag_coeff: float, frontal_area: float
 ) -> np.ndarray:
     """
     Calculates the aerodynamic drag force on the train.
@@ -196,18 +200,22 @@ def calc_aero_drag_force(
 
 
 def calc_wheel_support_force(
-        velocity: float, levitation_force: float, gravitational_force: float
+        velocity: float, levitation_force_z: float, gravitational_force_z: float
 ) -> np.ndarray:
     """
     Calculates the support force from the wheels at low speeds.
-    """
 
+    :param velocity: Train velocity (m/s)
+    :param levitation_force_z: Z-component of levitation force (N)
+    :param gravitational_force_z: Z-component of gravitational force (N)
+    :return: np.ndarray: Wheel support force vector [Fx, Fy, Fz] in Newtons
+    """
     f_wheel_support = np.zeros(3, dtype=float)
     takeoff_speed = config.SCMAGLEV_SYSTEM["levitation_takeoff_speed"]  # m/s
 
     if abs(velocity) < takeoff_speed:
         # Only apply support force if the net force is downwards
-        net_vertical_force = float(levitation_force) + float(gravitational_force)
+        net_vertical_force = levitation_force_z + gravitational_force_z
 
         if net_vertical_force < 0:
             f_wheel_support[2] = -net_vertical_force

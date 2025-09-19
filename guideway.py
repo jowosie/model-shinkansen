@@ -7,7 +7,7 @@ import config
 
 
 class Guideway:
-    def __init__(self, length=5000, width=10, coil_count=100, coil_diameter=0.05):
+    def __init__(self, length, width=10, coil_count=100, coil_diameter=0.05):
         """
         Initializes guideway.
         :param length (float): Length of guideway section (meters)

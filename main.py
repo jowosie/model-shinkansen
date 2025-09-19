@@ -34,14 +34,19 @@ def derivatives(t, y, train, guideway, target_velocity):
     # Update the train's physical position in the magpylib model
     train.set_position(position)
 
-    # Initialize force variables to None for debugging scope
-    induced_forces, propulsion_forces, gravitational_forces, aero_drag_forces, wheel_support_forces = (None,) * 5
+    # Initialize all forces to zero arrays to ensure they're never None
+    induced_forces = np.zeros(3, dtype=float)
+    propulsion_forces = np.zeros(3, dtype=float)
+    gravitational_forces = np.zeros(3, dtype=float)
+    aero_drag_forces = np.zeros(3, dtype=float)
+    wheel_support_forces = np.zeros(3, dtype=float)
 
     try:
         # Calculate Forces
         mass = config.LO_VEHICLE["total_mass_loaded"]
         air_density = config.CONSTANTS["air_density"]
 
+        # Calculate each force component - each function should always return a numpy array
         induced_forces = calc_induced_force(train, guideway, velocity[0], position[2], position[1])
         propulsion_forces = calc_propulsion_force(train, guideway, velocity[0], target_velocity, position[0], t)
         gravitational_forces = calc_gravity_force(mass)
@@ -52,14 +57,58 @@ def derivatives(t, y, train, guideway, target_velocity):
             config.LO_VEHICLE["frontal_area"],
         )
 
+        # Validate that all forces are numpy arrays
+        for force_name, force in [
+            ("induced", induced_forces),
+            ("propulsion", propulsion_forces),
+            ("gravitational", gravitational_forces),
+            ("aero_drag", aero_drag_forces)
+        ]:
+            if force is None:
+                print(f"WARNING: {force_name}_forces returned None, using zero vector")
+                if force_name == "induced":
+                    induced_forces = np.zeros(3, dtype=float)
+                elif force_name == "propulsion":
+                    propulsion_forces = np.zeros(3, dtype=float)
+                elif force_name == "gravitational":
+                    gravitational_forces = np.zeros(3, dtype=float)
+                elif force_name == "aero_drag":
+                    aero_drag_forces = np.zeros(3, dtype=float)
+            elif not isinstance(force, np.ndarray):
+                print(f"WARNING: {force_name}_forces returned {type(force)}, converting to numpy array")
+                if force_name == "induced":
+                    induced_forces = np.array(force, dtype=float).reshape(3)
+                elif force_name == "propulsion":
+                    propulsion_forces = np.array(force, dtype=float).reshape(3)
+                elif force_name == "gravitational":
+                    gravitational_forces = np.array(force, dtype=float).reshape(3)
+                elif force_name == "aero_drag":
+                    aero_drag_forces = np.array(force, dtype=float).reshape(3)
+
         # Pass only the z-components (scalars) to wheel support calculation
+        if induced_forces is not None:
+            levitation_z = float(induced_forces[2])
+        else:
+            levitation_z = 0.0
+
+        if gravitational_forces is not None:
+            gravity_z = float(gravitational_forces[2])
+        else:
+            gravity_z = 0.0
+
         wheel_support_forces = calc_wheel_support_force(
             velocity[0],
-            induced_forces[2] if isinstance(induced_forces, np.ndarray) else 0.0,
-            gravitational_forces[2] if isinstance(gravitational_forces, np.ndarray) else 0.0
+            levitation_z,
+            gravity_z
         )
 
-        total_forces = np.sum([induced_forces, propulsion_forces, gravitational_forces, aero_drag_forces, wheel_support_forces], axis=0)
+        # Ensure wheel_support_forces is also valid
+        if wheel_support_forces is None:
+            print("WARNING: wheel_support_forces returned None, using zero vector")
+            wheel_support_forces = np.zeros(3, dtype=float)
+
+        # Sum all forces
+        total_forces = induced_forces + propulsion_forces + gravitational_forces + aero_drag_forces + wheel_support_forces
 
         # Calculate acceleration
         acceleration = total_forces / mass
@@ -67,9 +116,10 @@ def derivatives(t, y, train, guideway, target_velocity):
         # Return the derivatives
         return np.concatenate((velocity, acceleration))
 
-    except TypeError as e:
+    except Exception as e:
         print("\n" + "="*20 + " DEBUG SNAPSHOT " + "="*20)
-        print(f"Caught a TypeError at simulation time t = {t:.4f}s")
+        print(f"Caught an exception at simulation time t = {t:.4f}s")
+        print(f"Error type: {type(e).__name__}")
         print(f"Error message: {e}")
         print("\n--- STATE VARIABLES ---")
         print(f"Position (y[:3]): {position}")
@@ -81,7 +131,7 @@ def derivatives(t, y, train, guideway, target_velocity):
         print(f"aero_drag_forces     | value: {aero_drag_forces}\t| type: {type(aero_drag_forces)}")
         print(f"wheel_support_forces | value: {wheel_support_forces}\t| type: {type(wheel_support_forces)}")
         print("="*58 + "\n")
-        # Re-raise the error to stop the simulation as before
+        # Re-raise the error to stop the simulation
         raise e
 
 
@@ -142,8 +192,8 @@ def simulation():
                 print(" >>> TAKEOFF SPEED REACHED -- LEVITATION SYSTEM ENGAGED <<<")
 
             # Prevents the train from falling through the guideway when on wheels
-            if on_wheels and y[2] < 0.02:
-                y[2] = 0.02  # z position
+            if on_wheels and y[2] < 0.1:
+                y[2] = 0.1  # z position
                 if y[5] < 0:
                     y[5] = 0  # vz velocity
 
@@ -151,10 +201,13 @@ def simulation():
             time_history.append(t)
             velocity_history.append(y[3])  # Stores forward velocity (vx)
             position_history.append(y[2])  # Stores vertical position (z)
-            force_history.append(
-                derivatives(t, y, train, guideway, target_velocity)[5]
-                * config.LO_VEHICLE["total_mass_loaded"]
-            )  # Stores levitation forces (F_z = m*a_z)
+
+            # Calculate force for history (with error checking)
+            deriv_result = derivatives(t, y, train, guideway, target_velocity)
+            if deriv_result is not None and len(deriv_result) >= 6:
+                force_history.append(deriv_result[5] * config.LO_VEHICLE["total_mass_loaded"])
+            else:
+                force_history.append(0.0)  # Default to zero if calculation fails
 
             if t % 1 == 0:
                 print(
@@ -162,6 +215,7 @@ def simulation():
                 )
         except Exception as e:
             print(f"An error occurred at t={t:.1f}s: {e}")
+            print(f"Current state: position={y[:3]}, velocity={y[3:]}")
             break
 
     print(f"Simulation finished. Recorded {len(time_history)} timesteps.")
