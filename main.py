@@ -34,24 +34,55 @@ def derivatives(t, y, train, guideway, target_velocity):
     # Update the train's physical position in the magpylib model
     train.set_position(position)
 
-    # Calculate Forces
-    mass = config.LO_VEHICLE["total_mass_loaded"]
-    air_density = config.CONSTANTS["air_density"]
+    # Initialize force variables to None for debugging scope
+    induced_forces, propulsion_forces, gravitational_forces, aero_drag_forces, wheel_support_forces = (None,) * 5
 
-    induced_forces = calc_induced_force(train, guideway, velocity[0], position[2], position[1])
-    propulsion_forces = calc_propulsion_force(train, guideway, velocity[0], target_velocity, position[0])
-    gravitational_forces = calc_gravity_force(mass)
-    aero_drag_forces = calc_aero_drag_force(velocity[0],air_density,config.LO_VEHICLE["cd_openair"],config.LO_VEHICLE["frontal_area"],)
+    try:
+        # Calculate Forces
+        mass = config.LO_VEHICLE["total_mass_loaded"]
+        air_density = config.CONSTANTS["air_density"]
 
-    wheel_support_forces = calc_wheel_support_force(velocity[0], induced_forces[2], gravitational_forces[2])
+        induced_forces = calc_induced_force(train, guideway, velocity[0], position[2], position[1])
+        propulsion_forces = calc_propulsion_force(train, guideway, velocity[0], target_velocity, position[0], t)
+        gravitational_forces = calc_gravity_force(mass)
+        aero_drag_forces = calc_aero_drag_force(
+            velocity[0],
+            air_density,
+            config.LO_VEHICLE["cd_openair"],
+            config.LO_VEHICLE["frontal_area"],
+        )
 
-    total_forces = np.sum([induced_forces, propulsion_forces, gravitational_forces, aero_drag_forces, wheel_support_forces], axis=0)
+        # Pass only the z-components (scalars) to wheel support calculation
+        wheel_support_forces = calc_wheel_support_force(
+            velocity[0],
+            induced_forces[2] if isinstance(induced_forces, np.ndarray) else 0.0,
+            gravitational_forces[2] if isinstance(gravitational_forces, np.ndarray) else 0.0
+        )
 
-    # Calculate acceleration
-    acceleration = total_forces / mass
+        total_forces = np.sum([induced_forces, propulsion_forces, gravitational_forces, aero_drag_forces, wheel_support_forces], axis=0)
 
-    # Return the derivatives
-    return np.concatenate((velocity, acceleration))
+        # Calculate acceleration
+        acceleration = total_forces / mass
+
+        # Return the derivatives
+        return np.concatenate((velocity, acceleration))
+
+    except TypeError as e:
+        print("\n" + "="*20 + " DEBUG SNAPSHOT " + "="*20)
+        print(f"Caught a TypeError at simulation time t = {t:.4f}s")
+        print(f"Error message: {e}")
+        print("\n--- STATE VARIABLES ---")
+        print(f"Position (y[:3]): {position}")
+        print(f"Velocity (y[3:]): {velocity}")
+        print("\n--- FORCE COMPONENTS (at time of error) ---")
+        print(f"induced_forces       | value: {induced_forces}\t| type: {type(induced_forces)}")
+        print(f"propulsion_forces    | value: {propulsion_forces}\t| type: {type(propulsion_forces)}")
+        print(f"gravitational_forces | value: {gravitational_forces}\t| type: {type(gravitational_forces)}")
+        print(f"aero_drag_forces     | value: {aero_drag_forces}\t| type: {type(aero_drag_forces)}")
+        print(f"wheel_support_forces | value: {wheel_support_forces}\t| type: {type(wheel_support_forces)}")
+        print("="*58 + "\n")
+        # Re-raise the error to stop the simulation as before
+        raise e
 
 
 def rk4_step(t, y, dt, train, guideway, target_velocity):

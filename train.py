@@ -20,30 +20,45 @@ class Train:
         self.magnet_strength = magnet_strength
         self.bogies = self.create_bogies()
 
+    # In train.py
+
     def create_bogies(self):
-        """Creates the magnet arrangement for the train's bogies"""
+        """Creates the magnet arrangement for the train's bogies."""
         all_magnets = []
-        bogie_length = 3 # meters
-        magnet_spacing_length = bogie_length / (self.magnets_per_bogie / 2)
-        magnet_width_spacing = config.SCMAGLEV_SYSTEM["lsm_pole_pitch"]
+        # Distance between the center of one bogie and the next
+        bogie_separation = 20  # meters
+
+        # The y-distance from the centerline to the magnets on each side
+        magnet_y_spacing = config.SCMAGLEV_SYSTEM["lsm_pole_pitch"]
+
+        # Number of magnet pairs (N-S) per side of a bogie
+        num_magnet_pairs_per_side = self.magnets_per_bogie // 2
 
         for i in range(self.num_bogies):
-            for j in range(self.magnets_per_bogie):
-                # Sets alternating polarities for magnets
-                polarity = 1 if j % 2 == 0 else -1
+            # Loop for each side of the bogie (-1 for left, 1 for right)
+            for side in [-1, 1]:
+                # Loop through each magnet position along the length of the bogie
+                for j in range(self.magnets_per_bogie):
+                    # Polarity alternates along the x-axis (j)
+                    polarity = 1 if j % 2 == 0 else -1
 
-                x_pos = (i * 15)
-                y_pos = -magnet_width_spacing/2 + (j % 2) * magnet_width_spacing
-                z_pos = (j // 2) * magnet_spacing_length - (bogie_length / 2)
+                    # Magnets are spaced by the pole pitch along the x-axis
+                    x_pos = (i * bogie_separation) + (j * config.SCMAGLEV_SYSTEM["lsm_pole_pitch"])
 
-                magnet = mpl.magnet.Cuboid(
-                    magnetization = (0,0, polarity * self.magnet_strength),
-                    dimension = (0.5, 0.2, 0.4), # meters (length, width, height)
-                    position = (x_pos, y_pos, z_pos)
-                )
-                all_magnets.append(magnet)
+                    # Y-position is constant for each side
+                    y_pos = side * magnet_y_spacing / 2
 
-                magnet.meshing = (5,5,5)
+                    # Z-position is constant
+                    z_pos = 0
+
+                    magnet = mpl.magnet.Cuboid(
+                        magnetization=(0, 0, polarity * self.magnet_strength),
+                        dimension=(0.5, 0.2, 0.4),  # meters (length, width, height)
+                        position=(x_pos, y_pos, z_pos)
+                    )
+                    all_magnets.append(magnet)
+
+                    magnet.meshing = (5, 5, 5)
 
         # Creates a single collection for all the magnets on the whole train
         return mpl.Collection(all_magnets)

@@ -7,7 +7,7 @@ import config
 
 
 class Guideway:
-    def __init__(self, length=50, width=10, coil_count=100, coil_diameter=0.05):
+    def __init__(self, length=5000, width=10, coil_count=100, coil_diameter=0.05):
         """
         Initializes guideway.
         :param length (float): Length of guideway section (meters)
@@ -68,25 +68,44 @@ class Guideway:
         Creates actively powered LSM coils for propulsion using Line objects.
         """
         prop_coils = []
-        num_coils_per_side = int(self.length * 2)
-        coil_side_length = self.coil_diameter
 
-        # Use same spacing as magnet spacing
-        magnet_width_spacing = config.SCMAGLEV_SYSTEM["lsm_pole_pitch"]
+        # Space coils according to pole pitch for proper LSM operation
+        magnet_pole_pitch = config.SCMAGLEV_SYSTEM["lsm_pole_pitch"]
+
+        # Number of coils based on track length and pole pitch
+        # Three coils per wavelength for three-phase system
+        wavelength = 2 * magnet_pole_pitch
+        coils_per_wavelength = 3
+        num_wavelengths = int(self.length / wavelength)
+        num_coils_per_side = num_wavelengths * coils_per_wavelength
+
+        coil_spacing = self.length / num_coils_per_side if num_coils_per_side > 0 else magnet_pole_pitch
+        coil_side_length = 0.3  # Size of each coil
 
         for side in [-1, 1]:
             for i in range(num_coils_per_side):
-                x_pos = (i - num_coils_per_side / 2) * 0.5
-                y_pos = side * (magnet_width_spacing / 2 - 0.2)
+                # Position along the track
+                x_pos = (i - num_coils_per_side / 2) * coil_spacing
+
+                # Lateral position - closer to centerline for better coupling
+                y_pos = side * (self.width / 4)  # Place at 1/4 of track width
                 z_pos = 0
 
-                # Define the four corners of a square path for the current
+                # Define the four corners of a rectangular coil
+                half_length = coil_side_length / 2
+                half_width = 0.1  # Narrower in y-direction
+
                 vertices = [
-                    (x_pos - coil_side_length / 2, y_pos, z_pos - coil_side_length / 2),
-                    (x_pos + coil_side_length / 2, y_pos, z_pos - coil_side_length / 2),
-                    (x_pos + coil_side_length / 2, y_pos, z_pos + coil_side_length / 2),
-                    (x_pos - coil_side_length / 2, y_pos, z_pos + coil_side_length / 2),
-                    (x_pos - coil_side_length / 2, y_pos, z_pos - coil_side_length / 2)
+                    (x_pos - half_length, y_pos - half_width, z_pos - half_length),
+                    (x_pos + half_length, y_pos - half_width, z_pos - half_length),
+                    (x_pos + half_length, y_pos + half_width, z_pos - half_length),
+                    (x_pos - half_length, y_pos + half_width, z_pos - half_length),
+                    (x_pos - half_length, y_pos - half_width, z_pos - half_length),
+                    (x_pos - half_length, y_pos - half_width, z_pos + half_length),
+                    (x_pos + half_length, y_pos - half_width, z_pos + half_length),
+                    (x_pos + half_length, y_pos + half_width, z_pos + half_length),
+                    (x_pos - half_length, y_pos + half_width, z_pos + half_length),
+                    (x_pos - half_length, y_pos - half_width, z_pos + half_length)
                 ]
 
                 coil = mpl.current.Line(
@@ -94,7 +113,7 @@ class Guideway:
                     vertices=vertices
                 )
 
-                coil.meshing = 20
+                coil.meshing = 10
                 prop_coils.append(coil)
 
         return mpl.Collection(prop_coils)
