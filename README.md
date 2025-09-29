@@ -9,6 +9,6 @@ Fully custom built physics engine that simulates the magnetic levitation and pro
 
 Real time PID tuning
 
-An executable app with a clean UI
+An executable app
 
-Real world lines that can be simulated
+Real world lines
