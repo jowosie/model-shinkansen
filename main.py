@@ -34,8 +34,14 @@ def derivatives(t, y, train, guideway, target_velocity):
     # Update the train's physical position in the magpylib model
     train.set_position(position)
 
-    # Initialize force variables to None for debugging scope
-    induced_forces, propulsion_forces, gravitational_forces, aero_drag_forces, wheel_support_forces = (None,) * 5
+    # Initialize force variables
+    induced_forces = np.zeros(3)
+    propulsion_forces = np.zeros(3)
+    gravitational_forces = np.zeros(3)
+    aero_drag_forces = np.zeros(3)
+    wheel_support_forces = np.zeros(3)
+
+    #induced_forces, propulsion_forces, gravitational_forces, aero_drag_forces, wheel_support_forces = (None,) * 5
 
     try:
         # Calculate Forces

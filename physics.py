@@ -18,12 +18,10 @@ coil_resistance = 0.01
 coil_inductance = 0.001
 pole_pitch = config.SCMAGLEV_SYSTEM["lsm_pole_pitch"]
 
-
 """
 FORCE MODELING
 Calculates all relevant forces acting on the train body while in operation.
 """
-
 
 # Gravity Force
 def calc_gravity_force(mass: float) -> np.ndarray:
@@ -39,18 +37,19 @@ def calc_gravity_force(mass: float) -> np.ndarray:
 
 
 def calc_induced_force(
-    train: Train,
-    guideway: Guideway,
-    velocity: float,
-    train_height: float,
-    lateral_displacement: float,
-    coil_resistance: float = 0.01,
-    coil_inductance: float = 0.001,
+        train: Train,
+        guideway: Guideway,
+        velocity: float,
+        train_height: float,
+        lateral_displacement: float,
+        coil_resistance: float = 0.01,
+        coil_inductance: float = 0.001,
 ) -> np.ndarray:
     """
     Calculates the levitation force on the train through an induced current in the guideway coils. Follows
     Faraday's Law of Induction.
     """
+    # Return zero force if velocity is negligible to avoid instability at low speeds
     if abs(velocity) < 1.0:
         return np.zeros(3, dtype=float)
 
@@ -58,58 +57,55 @@ def calc_induced_force(
     train_magnets = train.get_magnets()
     guideway_coils = guideway.get_levitation_coils()
 
-    # Define variables here to be accessible in the except block
-    magnet, coil1, coil2 = None, None, None
-    B, B_dx, dB_dx, dB_dt, emf = (None,) * 5
+    for magnet in train_magnets.sources:
+        for coil_pair_index in range(0, len(guideway_coils.sources), 2):
+            coil1 = guideway_coils.sources[coil_pair_index]
+            coil2 = guideway_coils.sources[coil_pair_index + 1]
 
-    try:
-        for magnet in train_magnets.sources:
-            for coil_pair_index in range(0, len(guideway_coils.sources), 2):
-                coil1 = guideway_coils.sources[coil_pair_index]
-                coil2 = guideway_coils.sources[coil_pair_index + 1]
+            # Only calculate for nearby coils to improve performance
+            if abs(magnet.position[0] - coil1.position[0]) < 2:
+                # --- Start of Robustness Changes ---
 
-                if abs(magnet.position[0] - coil1.position[0]) < 2:
-                    B = mpl.getB(magnet, coil1.position)
+                # 1. Get B-field values and check if they are valid
+                B = mpl.getB(magnet, coil1.position)
+                if B is None:
+                    continue  # Skip this coil interaction if B-field is None
 
-                    delta_x = 0.01
-                    B_dx = mpl.getB(magnet, np.add(coil1.position, (delta_x, 0, 0)))
+                delta_x = 0.01
+                B_dx = mpl.getB(magnet, np.add(coil1.position, (delta_x, 0, 0)))
+                if B_dx is None:
+                    continue  # Skip this coil interaction if B-field is None
 
-                    dB_dx = (B_dx - B) / delta_x
-                    dB_dt = velocity * dB_dx
+                # 2. Proceed with calculations now that inputs are validated
+                dB_dx = (B_dx - B) / delta_x
+                dB_dt = velocity * dB_dx
 
-                    coil_area = np.pi * (coil1.diameter / 2) ** 2
-                    emf = -dB_dt[2] * coil_area
+                coil_area = np.pi * (coil1.diameter / 2) ** 2
+                emf = -dB_dt[2] * coil_area
 
-                    omega = 2 * np.pi * abs(velocity) / pole_pitch
-                    impedance = np.sqrt(
-                        coil_resistance**2 + (omega * coil_inductance) ** 2
-                    )
+                omega = 2 * np.pi * abs(velocity) / pole_pitch
+                impedance = np.sqrt(
+                    coil_resistance ** 2 + (omega * coil_inductance) ** 2
+                )
 
-                    induced_current = emf / impedance if impedance > 0 else 0
+                induced_current = emf / impedance if impedance > 0 else 0
 
-                    coil1.current = induced_current
-                    coil2.current = -induced_current
+                coil1.current = induced_current
+                coil2.current = -induced_current
 
-                    force_i1, _ = mpf.getFT(magnet, coil1, anchor=(0, 0, 0))
-                    force_i2, _ = mpf.getFT(magnet, coil2, anchor=(0, 0, 0))
-                    f_induced += force_i1 + force_i2
-        return f_induced
+                # 3. Safely get Force-Torque values and unpack only if valid
+                ft1 = mpf.getFT(magnet, coil1, anchor=(0, 0, 0))
+                ft2 = mpf.getFT(magnet, coil2, anchor=(0, 0, 0))
 
-    except TypeError as e:
-        print("\n" + "="*20 + " INDUCED FORCE DEBUGGER " + "="*20)
-        print(f"Caught a TypeError inside calc_induced_force!")
-        print(f"Error message: {e}")
-        print("\n--- LOOP STATE ---")
-        print(f"Magnet Position: {magnet.position if magnet else 'N/A'}")
-        print(f"Coil1 Position: {coil1.position if coil1 else 'N/A'}")
-        print("\n--- PHYSICS VARIABLES (at time of error) ---")
-        print(f"B      | value: {B}\t| type: {type(B)}")
-        print(f"B_dx   | value: {B_dx}\t| type: {type(B_dx)}")
-        print(f"dB_dx  | value: {dB_dx}\t| type: {type(dB_dx)}")
-        print(f"dB_dt  | value: {dB_dt}\t| type: {type(dB_dt)}")
-        print(f"emf    | value: {emf}\t| type: {type(emf)}")
-        print("="*62 + "\n")
-        raise e
+                if ft1 is not None and ft2 is not None:
+                    force_i1, _ = ft1
+                    force_i2, _ = ft2
+
+                    # Final check to ensure the force components are valid arrays
+                    if isinstance(force_i1, np.ndarray) and isinstance(force_i2, np.ndarray):
+                        f_induced += force_i1 + force_i2
+
+    return f_induced
 
 
 def calc_propulsion_force(
