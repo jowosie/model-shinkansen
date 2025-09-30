@@ -32,7 +32,7 @@ def derivatives(t, y, train, guideway, target_velocity):
     velocity = y[3:]
 
     # Update the train's physical position in the magpylib model
-    train.set_position(position)
+    train.set_position(np.array(position))
 
     # Initialize force variables
     induced_forces = np.zeros(3)

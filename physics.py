@@ -23,6 +23,7 @@ FORCE MODELING
 Calculates all relevant forces acting on the train body while in operation.
 """
 
+
 # Gravity Force
 def calc_gravity_force(mass: float) -> np.ndarray:
     """
@@ -93,24 +94,33 @@ def calc_induced_force(
                 coil1.current = induced_current
                 coil2.current = -induced_current
 
-                # 3. Safely get Force-Torque values and unpack only if valid
-                ft1 = mpf.getFT(magnet, coil1, anchor=(0, 0, 0))
-                ft2 = mpf.getFT(magnet, coil2, anchor=(0, 0, 0))
+                # 3. Safely get Force-Torque values with proper error handling
+                try:
+                    ft1 = mpf.getFT(magnet, coil1, anchor=(0, 0, 0))
+                    ft2 = mpf.getFT(magnet, coil2, anchor=(0, 0, 0))
 
-                if ft1 is not None and ft2 is not None:
-                    force_i1, _ = ft1
-                    force_i2, _ = ft2
+                    # Check if the results are tuples with expected structure
+                    if (ft1 is not None and ft2 is not None and
+                            isinstance(ft1, tuple) and isinstance(ft2, tuple) and
+                            len(ft1) >= 2 and len(ft2) >= 2):
 
-                    # Final check to ensure the force components are valid arrays
-                    if isinstance(force_i1, np.ndarray) and isinstance(force_i2, np.ndarray):
-                        f_induced += force_i1 + force_i2
+                        force_i1, _ = ft1
+                        force_i2, _ = ft2
+
+                        # Final check to ensure the force components are valid arrays
+                        if isinstance(force_i1, np.ndarray) and isinstance(force_i2, np.ndarray):
+                            f_induced += force_i1 + force_i2
+
+                except (TypeError, ValueError) as e:
+                    # Skip this interaction if there's an error unpacking
+                    continue
 
     return f_induced
 
 
 def calc_propulsion_force(
-    train: Train, guideway: Guideway, velocity: float, target_velocity: float,
-    train_x_position: float, time: float = 0
+        train: Train, guideway: Guideway, velocity: float, target_velocity: float,
+        train_x_position: float, time: float = 0
 ) -> np.ndarray:
     """
     Calculates the propulsion force from the LSM.
@@ -155,20 +165,32 @@ def calc_propulsion_force(
 
         coil.current = max_current * np.sin(total_phase + phase_offset)
 
-    # 2. Calculate the total force on the train
+    # 2. Calculate the total force on the train with proper error handling
     for magnet in train_magnets.sources:
         for coil in propulsion_coils.sources:
             # Only calculate for nearby coils to save computation
             distance = abs(magnet.position[0] - coil.position[0])
             if distance < 3.0:
-                # Calculate the force ON the magnet FROM the coil
-                # Note: The force direction might need to be reversed depending on
-                # the magpylib convention
-                force_p, _ = mpf.getFT(magnet, coil, anchor=(0, 0, 0))
+                try:
+                    # Calculate the force ON the magnet FROM the coil
+                    ft_result = mpf.getFT(magnet, coil, anchor=(0, 0, 0))
 
-                # Add a distance-based scaling factor for more realistic force distribution
-                force_scale = np.exp(-distance / 2.0)
-                f_propulsion += force_p * force_scale
+                    # Check if result is valid tuple
+                    if (ft_result is not None and
+                            isinstance(ft_result, tuple) and
+                            len(ft_result) >= 2):
+
+                        force_p, _ = ft_result
+
+                        # Verify force_p is a valid numpy array
+                        if isinstance(force_p, np.ndarray):
+                            # Add a distance-based scaling factor for more realistic force distribution
+                            force_scale = np.exp(-distance / 2.0)
+                            f_propulsion += force_p * force_scale
+
+                except (TypeError, ValueError) as e:
+                    # Skip this interaction if there's an error
+                    continue
 
     # Add a startup assistance force if velocity is very low
     # This helps overcome initial static friction and gets the train moving
@@ -178,9 +200,10 @@ def calc_propulsion_force(
 
     return f_propulsion
 
+
 # Aerodynamic Drag
 def calc_aero_drag_force(
-    velocity: float, density: float, drag_coeff: float, frontal_area: float
+        velocity: float, density: float, drag_coeff: float, frontal_area: float
 ) -> np.ndarray:
     """
     Calculates the aerodynamic drag force on the train.
