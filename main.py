@@ -65,7 +65,8 @@ def derivatives(t, y, train, guideway, target_velocity):
             gravitational_forces[2] if isinstance(gravitational_forces, np.ndarray) else 0.0
         )
 
-        total_forces = np.sum([induced_forces, propulsion_forces, gravitational_forces, aero_drag_forces, wheel_support_forces], axis=0)
+        total_forces = induced_forces + propulsion_forces + gravitational_forces + aero_drag_forces + wheel_support_forces
+        print(f"Propulsion Force: {propulsion_forces}\nLevitation Force: {induced_forces}")
 
         # Calculate acceleration
         acceleration = total_forces / mass
@@ -95,16 +96,16 @@ def rk4_step(t, y, dt, train, guideway, target_velocity):
     """
     Performs a single step of the RK4 method.
     """
-    print(f"  Calculating RK4 step 1/4 for time t={t:.2f}s...")
+    #print(f"  Calculating RK4 step 1/4 for time t={t:.2f}s...")
     k1 = derivatives(t, y, train, guideway, target_velocity)
 
-    print(f"  Calculating RK4 step 2/4 for time t={t:.2f}s...")
+    #print(f"  Calculating RK4 step 2/4 for time t={t:.2f}s...")
     k2 = derivatives(t + 0.5 * dt, y + 0.5 * dt * k1, train, guideway, target_velocity)
 
-    print(f"  Calculating RK4 step 3/4 for time t={t:.2f}s...")
+    #print(f"  Calculating RK4 step 3/4 for time t={t:.2f}s...")
     k3 = derivatives(t + 0.5 * dt, y + 0.5 * dt * k2, train, guideway, target_velocity)
 
-    print(f"  Calculating RK4 step 4/4 for time t={t:.2f}s...")
+    #print(f"  Calculating RK4 step 4/4 for time t={t:.2f}s...")
     k4 = derivatives(t + dt, y + dt * k3, train, guideway, target_velocity)
 
     return y + (dt / 6.0) * (k1 + 2 * k2 + 2 * k3 + k4)
@@ -123,7 +124,7 @@ def simulation():
     # Initialize Model Objects
     print("\n >>>>> INITIALIZING TRAIN AND GUIDEWAY MODELS <<<<<\n")
     train = Train(num_bogies=2, magnets_per_bogie=8)
-    guideway = Guideway(length=50)
+    guideway = Guideway(length=100)
 
     # Initialize State Variables
     # State vector y = [x, y, z, vx, vy, vz]
@@ -162,10 +163,11 @@ def simulation():
                 * config.LO_VEHICLE["total_mass_loaded"]
             )  # Stores levitation forces (F_z = m*a_z)
 
-            if t % 1 == 0:
-                print(
-                    f"Time: {t:.1f}s, Speed: {y[3] * 3.6:.1f} km/h, Levitation gap: {y[2] * 100:.2f} cm"
-                )
+
+            print(
+                f"Time: {t:.1f}s, Speed: {y[3] * 3.6:.1f} km/h, Levitation gap: {y[2] * 100:.2f} cm"
+            )
+
         except Exception as e:
             print(f"An error occurred at t={t:.1f}s: {e}")
             break

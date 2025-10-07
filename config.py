@@ -5,7 +5,7 @@ All units in SI unless otherwise stated
 
 # Simulation Controls
 SIM_CONTROLS = {
-    "dt": 0.05,
+    "dt": 0.1,
     "sim_time_min": 1,
 }
 

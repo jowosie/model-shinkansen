@@ -134,8 +134,8 @@ def calc_propulsion_force(
     current_gain = config.SCMAGLEV_SYSTEM["current_gain"]
 
     # Use a base current even at zero velocity to start the train
-    base_current = 1000  # Base current to ensure the train can start
-    max_current = np.clip(error * current_gain + base_current, -5000, 5000)
+    base_current = 2000  # Base current to ensure the train can start
+    max_current = np.clip(error * current_gain + base_current, -50000, 50000)
 
     lsm_wavelength = 2.0 * pole_pitch
 
@@ -194,8 +194,11 @@ def calc_propulsion_force(
 
     # Add a startup assistance force if velocity is very low
     # This helps overcome initial static friction and gets the train moving
-    if abs(velocity) < 1.0 and error > 0:
-        startup_force = 50000 * error  # Proportional startup assistance
+    startup_taper_speed = 5  # The speed at which the startup force is fully tapered off (m/s)
+    if abs(velocity) < startup_taper_speed and error > 0:
+        # Calculate a scaling factor that decreases linearly from 1 to 0 as velocity goes from 0 to startup_taper_speed.
+        taper_factor = (startup_taper_speed - abs(velocity)) / startup_taper_speed
+        startup_force = 50000 * error * taper_factor  # Proportional startup assistance with tapering
         f_propulsion[0] += startup_force
 
     return f_propulsion
